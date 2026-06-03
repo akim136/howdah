@@ -47,6 +47,10 @@ Set `ANTHROPIC_API_KEY` in `.env` (gitignored) or the environment. The judge use
 
 Drop your own `(context, question, answer, label)` rows into `data/cases.json` to benchmark a different domain, or point the judge at your RAG pipeline's real outputs. The rubric and grounding prompts live in `src/rubric.ts` and `src/grounding.ts`.
 
+## Built with
+
+Claude Code, used as a pair-programmer. The problem framing, the three-layer architecture, the faithfulness rubric, the dataset, and the methodology decisions are mine; the agent accelerated the implementation. The commit history is co-authored accordingly — I think that's the honest way to ship in 2026, and knowing how to drive an agent to a clean, tested, measurable result is part of the point.
+
 ## License
 
 MIT.
