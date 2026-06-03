@@ -1,0 +1,18 @@
+{
+  "name": "howdah",
+  "version": "0.1.0",
+  "description": "An LLM-as-judge eval harness for RAG/agent answer faithfulness: deterministic checks + a Haiku→Sonnet judge cascade + a no-fabrication grounding check, scored against gold labels.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "eval": "tsx src/run.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

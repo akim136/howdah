@@ -1,0 +1,146 @@
+[
+  {
+    "id": "memo-headcount-faithful",
+    "context": "Internal memo, Northwind Logistics. The Atlanta hub added 42 warehouse staff in Q3, bringing its total to 318. The Memphis hub was unchanged at 205.",
+    "question": "How many warehouse staff does the Atlanta hub have after Q3?",
+    "answer": "After Q3, the Atlanta hub has 318 warehouse staff.",
+    "label": "faithful",
+    "note": "Directly stated number."
+  },
+  {
+    "id": "memo-headcount-fabricated-number",
+    "context": "Internal memo, Northwind Logistics. The Atlanta hub added 42 warehouse staff in Q3, bringing its total to 318. The Memphis hub was unchanged at 205.",
+    "question": "How many warehouse staff does the Atlanta hub have after Q3?",
+    "answer": "After Q3, the Atlanta hub has 342 warehouse staff.",
+    "label": "unfaithful",
+    "note": "Fabricated number (342) contradicts the stated 318."
+  },
+  {
+    "id": "product-spec-faithful-synthesis",
+    "context": "Veridia Smart Thermostat spec: operating range 0 to 40 C; pairs over Wi-Fi (2.4 GHz only); battery backup lasts 8 hours.",
+    "question": "Will the thermostat keep working during a short power outage, and on what Wi-Fi band?",
+    "answer": "Yes — it has an 8-hour battery backup, and it pairs over 2.4 GHz Wi-Fi.",
+    "label": "faithful",
+    "note": "Both facts supported; reasonable synthesis."
+  },
+  {
+    "id": "product-spec-invented-feature",
+    "context": "Veridia Smart Thermostat spec: operating range 0 to 40 C; pairs over Wi-Fi (2.4 GHz only); battery backup lasts 8 hours.",
+    "question": "Does the thermostat support voice assistants?",
+    "answer": "Yes, it works with Alexa and Google Assistant out of the box.",
+    "label": "unfaithful",
+    "note": "Invented feature; spec says nothing about voice assistants."
+  },
+  {
+    "id": "report-missing-info-refusal",
+    "context": "Quarterly summary, GlomCorp: revenue rose to 12.4M. The summary does not break revenue down by region.",
+    "question": "What was GlomCorp's revenue in the EMEA region?",
+    "answer": "The summary reports total revenue of 12.4M but does not break it down by region, so EMEA revenue isn't stated.",
+    "label": "faithful",
+    "note": "Correct refusal — the answer is genuinely absent."
+  },
+  {
+    "id": "report-missing-info-guess",
+    "context": "Quarterly summary, GlomCorp: revenue rose to 12.4M. The summary does not break revenue down by region.",
+    "question": "What was GlomCorp's revenue in the EMEA region?",
+    "answer": "EMEA contributed roughly 4.1M of the 12.4M total.",
+    "label": "unfaithful",
+    "note": "Should have refused; invents a regional figure."
+  },
+  {
+    "id": "abstract-overclaim",
+    "context": "Research abstract: in a pilot of 30 patients, the treatment was associated with a modest reduction in symptoms; the authors note the sample was small and call for a larger trial.",
+    "question": "Is the treatment effective?",
+    "answer": "Yes, the study proves the treatment is highly effective at reducing symptoms.",
+    "label": "unfaithful",
+    "note": "Over-claim: 'modest, small pilot, calls for larger trial' becomes 'proves highly effective'."
+  },
+  {
+    "id": "abstract-faithful-hedged",
+    "context": "Research abstract: in a pilot of 30 patients, the treatment was associated with a modest reduction in symptoms; the authors note the sample was small and call for a larger trial.",
+    "question": "What did the pilot find?",
+    "answer": "In a small 30-patient pilot, the treatment was linked to a modest symptom reduction; the authors caution the sample was small and want a larger trial.",
+    "label": "faithful",
+    "note": "Faithful, appropriately hedged paraphrase."
+  },
+  {
+    "id": "policy-paraphrase-faithful",
+    "context": "Refund policy: customers may return unopened items within 30 days for a full refund. Opened items are eligible for store credit only.",
+    "question": "Can I get a full refund on an opened item?",
+    "answer": "No — opened items are only eligible for store credit; full refunds apply to unopened items returned within 30 days.",
+    "label": "faithful",
+    "note": "Accurate paraphrase of both clauses."
+  },
+  {
+    "id": "policy-contradiction",
+    "context": "Refund policy: customers may return unopened items within 30 days for a full refund. Opened items are eligible for store credit only.",
+    "question": "How long do I have to return an unopened item?",
+    "answer": "You have 60 days to return unopened items for a full refund.",
+    "label": "unfaithful",
+    "note": "Contradicts the stated 30-day window."
+  },
+  {
+    "id": "history-date-faithful",
+    "context": "The Veridia Public Library was founded in 1921 and moved to its current building in 1968.",
+    "question": "When did the library move to its current building?",
+    "answer": "It moved to its current building in 1968.",
+    "label": "faithful",
+    "note": "Date directly supported."
+  },
+  {
+    "id": "history-date-invented",
+    "context": "The Veridia Public Library was founded in 1921 and moved to its current building in 1968.",
+    "question": "When was the library renovated?",
+    "answer": "The library was renovated in 1995.",
+    "label": "unfaithful",
+    "note": "Invented date; no renovation is mentioned."
+  },
+  {
+    "id": "offtopic-refusal-faithful",
+    "context": "Trail guide: the Ridgeway Loop is 7.2 km with 240 m of elevation gain and takes about 2.5 hours.",
+    "question": "Are dogs allowed on the Ridgeway Loop?",
+    "answer": "The guide covers distance, elevation, and time but doesn't say whether dogs are allowed.",
+    "label": "faithful",
+    "note": "Correctly declines an off-topic question."
+  },
+  {
+    "id": "quote-misattribution",
+    "context": "Panel notes: the CFO, Dana Reyes, said the company would 'prioritize margin over growth' next year. The CEO did not comment on strategy.",
+    "question": "What did the CEO say about next year's strategy?",
+    "answer": "The CEO said the company would prioritize margin over growth next year.",
+    "label": "unfaithful",
+    "note": "Misattributes the CFO's quote to the CEO, who did not comment."
+  },
+  {
+    "id": "supported-negative-faithful",
+    "context": "Incident report: the outage affected the EU region from 02:00 to 03:15 UTC. No customer data was lost.",
+    "question": "Was any customer data lost in the outage?",
+    "answer": "No — the report states no customer data was lost.",
+    "label": "faithful",
+    "note": "Supported negative claim."
+  },
+  {
+    "id": "causal-overreach",
+    "context": "Sales dashboard: signups rose 18% in March. A new landing page also launched in March.",
+    "question": "Why did signups rise in March?",
+    "answer": "Signups rose 18% in March because the new landing page launched that month.",
+    "label": "unfaithful",
+    "note": "Asserts causation the context only correlates (both happened in March)."
+  },
+  {
+    "id": "numeric-supported-faithful",
+    "context": "Release notes: the API rate limit was raised from 60 to 120 requests per minute in v2.3.",
+    "question": "What is the new API rate limit?",
+    "answer": "As of v2.3, the rate limit is 120 requests per minute (up from 60).",
+    "label": "faithful",
+    "note": "Both numbers present and correct."
+  },
+  {
+    "id": "scale-unit-error",
+    "context": "Grant summary: the program awarded 250 thousand dollars across 10 community projects.",
+    "question": "How much did the program award in total?",
+    "answer": "The program awarded 250 million dollars across 10 community projects.",
+    "label": "unfaithful",
+    "note": "Scale error: 'thousand' became 'million'."
+  }
+]
