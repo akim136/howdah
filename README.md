@@ -22,6 +22,8 @@ An answer is judged **faithful** only if it clears the score threshold *and* has
 
 Treating *"unfaithful"* as the positive class makes the harness's own accuracy a number you can cite — which is the point: an eval you can't evaluate isn't an eval.
 
+> Note: `data/cases.json` is a small (~18-case), hand-authored **demonstration** set with deliberately clear-cut faithful/unfaithful examples — it shows the harness behaves correctly, not that it's a benchmark. Swap in your own labeled cases to measure performance on a real distribution.
+
 ## Run it
 
 ```bash

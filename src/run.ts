@@ -64,11 +64,17 @@ async function main(): Promise<void> {
       flags: [...chk.failures],
     };
     if (judging) {
-      const v = await judge(c, { apiKey: apiKey!, rubric: FAITHFULNESS });
-      row.predicted = v.faithful ? "faithful" : "unfaithful";
-      row.score = v.overall;
-      row.escalated = v.escalated;
-      row.flags.push(...v.flags);
+      // Isolate per-case failures: one API hiccup shouldn't abandon the whole run. The case stays
+      // predicted "—" and is excluded from the metrics below.
+      try {
+        const v = await judge(c, { apiKey: apiKey!, rubric: FAITHFULNESS });
+        row.predicted = v.faithful ? "faithful" : "unfaithful";
+        row.score = v.overall;
+        row.escalated = v.escalated;
+        row.flags.push(...v.flags);
+      } catch (err) {
+        row.flags.push(`judge error: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+      }
     }
     rows.push(row);
     if (!quiet) process.stderr.write(`  ${row.id}: gold=${row.gold} predicted=${row.predicted}${row.score !== null ? ` (${row.score}/5${row.escalated ? " [sonnet]" : ""})` : ""}\n`);
@@ -92,9 +98,12 @@ function buildReport(rows: Row[], judging: boolean): string {
   md.push(`The unsupported-number heuristic flagged ${numHeuristicHits.length} case(s); ${numHeuristicOnUnfaithful} of those are gold-unfaithful (cheap fabrication catches before any LLM call).`, "");
 
   if (judging) {
-    // Hallucination detection treated as positive class = "unfaithful".
+    // Hallucination detection treated as positive class = "unfaithful". Only count cases the judge
+    // actually scored (a per-case error leaves predicted "—" and is excluded here).
+    const judged = rows.filter((r) => r.predicted !== "—");
+    const errored = rows.length - judged.length;
     let tp = 0, fp = 0, fn = 0, tn = 0, escalated = 0;
-    for (const r of rows) {
+    for (const r of judged) {
       const predUnfaithful = r.predicted === "unfaithful";
       const goldUnfaithful = r.gold === "unfaithful";
       if (predUnfaithful && goldUnfaithful) tp++;
@@ -107,14 +116,15 @@ function buildReport(rows: Row[], judging: boolean): string {
     const precision = tp / (tp + fp);
     const recall = tp / (tp + fn);
     const f1 = (2 * precision * recall) / (precision + recall);
-    const accuracy = (tp + tn) / n;
+    const accuracy = judged.length ? (tp + tn) / judged.length : NaN;
     md.push(`## Hallucination detection (positive class = "unfaithful")`, "");
+    if (errored) md.push(`> ${errored} case(s) errored during judging and are excluded from the metrics below.`, "");
     md.push(`| Metric | Value |`, `|---|---|`);
     md.push(`| Accuracy | ${pct(accuracy)} |`);
     md.push(`| Precision | ${pct(precision)} |`);
     md.push(`| Recall | ${pct(recall)} |`);
     md.push(`| F1 | ${pct(f1)} |`);
-    md.push(`| Judge escalations (Haiku→Sonnet) | ${escalated}/${n} |`, "");
+    md.push(`| Judge escalations (Haiku→Sonnet) | ${escalated}/${judged.length} |`, "");
     md.push(`Confusion matrix: TP ${tp} · FP ${fp} · FN ${fn} · TN ${tn}`, "");
   }
 
