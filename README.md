@@ -1,5 +1,7 @@
 # howdah
 
+[![CI](https://github.com/akim136/howdah/actions/workflows/ci.yml/badge.svg)](https://github.com/akim136/howdah/actions/workflows/ci.yml)
+
 **An eval harness for RAG / agent answer faithfulness — does the answer stay true to its context, or does it hallucinate?**
 
 A *howdah* is the seat that rides on top of an elephant. This is the seat that rides on top of your LLM: a lightweight judge that sits above model outputs and checks them, rather than trusting them.
