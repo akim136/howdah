@@ -1,5 +1,7 @@
 # Faithfulness eval report — 2026-06-03
 
+> Historical output from the original v1 methodology, preserved below. V1 mixed factual support (weights 0.4 and 0.3) with completeness and refusal quality (0.15 each), used permissive parsers, and did not make rubric flags binding. Its 100% result on 18 hand-authored demonstration cases is not a validated accuracy claim for v2 or a general benchmark. This report has not been rerun under the current contract.
+
 Cases: 18. Mode: deterministic checks + LLM judge + grounding.
 
 ## Deterministic layer (free, no API key)
