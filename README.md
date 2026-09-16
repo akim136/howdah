@@ -85,9 +85,11 @@ Evaluator instructions use the system message; serialized input uses the user me
 
 `data/cases.json` remains the original **18-case hand-authored synthetic smoke suite**, with deliberately clear-cut examples. It demonstrates the harness's mechanics; it does not establish accuracy on real inputs. [The historical sample report](sample-report.md) preserves the June 2026 output and identifies its original, incompatible v1 methodology. Its published 100% is not evidence for the current rubric.
 
+[Calibration dataset v1](data/README.md) adds 48 synthetic cases across development and held-out splits, grouped by source/scenario and annotated with provenance and rationale. Its agent-authored labels await independent human review; no accuracy claim or live calibration result is implied.
+
 Tests exercise parsing, verdict construction, cascade decisions, transport failures, metrics, input validation, and the actual CLI with a mocked API. They make no paid calls and do not establish judge accuracy. CI runs these checks and a checks-only smoke run on Node 24.
 
-Next work is separate: add realistic development/held-out examples split by source or scenario, calibrate graders, compare single-model baselines with the cascade, and report repeated-trial uncertainty, usage, latency, and reviewed failures. Recorded agent traces and a synthetic support environment follow that work. The current harness evaluates completed answers; it does not verify tool actions or task completion.
+Next work is separate: independently review the annotations, calibrate graders, compare single-model baselines with the cascade, and report repeated-trial uncertainty, usage, latency, and reviewed failures. Recorded agent traces and a synthetic support environment follow that work. The current harness evaluates completed answers; it does not verify tool actions or task completion.
 
 ## Code map
 
