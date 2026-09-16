@@ -1,0 +1,9 @@
+{
+  "currency": "USD",
+  "asOf": "2026-09-16",
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "rates": {
+    "claude-haiku-4-5-20251001": { "input": 1, "output": 5, "cacheRead": 0.1, "cacheCreation": null },
+    "claude-sonnet-4-6": { "input": 3, "output": 15, "cacheRead": 0.3, "cacheCreation": null }
+  }
+}

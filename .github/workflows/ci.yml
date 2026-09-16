@@ -19,3 +19,4 @@ jobs:
       - run: npm test
       # The deterministic layer needs no API key, so it runs on every PR (incl. forks) with no secrets.
       - run: npm run eval -- --checks-only --quiet --output-dir "$RUNNER_TEMP/howdah-checks"
+      - run: npm run compare -- --checks-only --trials 2 --quiet --output-dir "$RUNNER_TEMP/howdah-comparisons"

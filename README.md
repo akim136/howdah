@@ -53,9 +53,20 @@ npm run typecheck
 
 Full mode requires `ANTHROPIC_API_KEY` in the environment or `.env`. Missing/blank credentials and the example placeholder fail clearly; they never switch modes. Explicit environment values take precedence over `.env`. Checks-only mode does not read `.env`.
 
-Options: `--dataset PATH`, `--output-dir PATH`, `--checks-only`, `--quiet`. Defaults are `data/cases.json` and the repository root. Each run replaces `results.json` and `report.md` in its output directory; use distinct directories to preserve runs. The default artifact names are gitignored.
+Options: `--dataset PATH`, `--output-dir PATH`, `--strategy haiku|sonnet|cascade`, `--checks-only`, `--quiet`. Defaults are `data/cases.json`, the repository root, and the cascade. Each run replaces `results.json` and `report.md` in its output directory; use distinct directories to preserve runs. The default artifact names are gitignored.
 
 Exit status is **1** for invalid configuration/data, output failures, or any evaluation error. Evaluation errors retain every case and all completed stages in the written artifacts. Abstentions and poor classification performance return **0**: inspect coverage and metrics before drawing conclusions. A process interruption is not a completed run; artifacts are written after all cases finish.
+
+## Model comparisons and repeated trials
+
+`npm run compare` evaluates identical inputs with Haiku-only, Sonnet-only, and the cascade, with configurable repeated trials. It records per-trial metrics, coverage, outcome agreement, usage, latency, and optional estimates from an explicit pricing file. Each comparison publishes a unique directory with full trial artifacts and a hashed manifest.
+
+```bash
+# Free pipeline check with two trials of each strategy:
+npm run compare -- --checks-only --trials 2 --output-dir /tmp/howdah-comparisons
+```
+
+See [comparison commands and methodology](docs/comparisons.md) for paid-run options, cost limitations, failure recovery, and how to interpret repeated trials. Checks-only runs establish no grader accuracy. A repeated judgment is not an independent data sample.
 
 ## Input and output
 

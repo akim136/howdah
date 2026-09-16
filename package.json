@@ -9,6 +9,7 @@
   },
   "scripts": {
     "eval": "node --import tsx src/run.ts",
+    "compare": "node --import tsx src/compare.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
