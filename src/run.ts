@@ -1,144 +1,121 @@
-/**
- * Run the harness over data/cases.json and write report.md.
- *
- *   npm run eval                  full run (deterministic checks + LLM judge + grounding) — needs ANTHROPIC_API_KEY
- *   npm run eval -- --checks-only deterministic layer only — no API key, free
- *   npm run eval -- --quiet       don't print the report to stdout
- *
- * Treats "unfaithful" as the positive class (we are detecting hallucinations) and scores the judge's
- * predictions against the gold labels: precision / recall / F1, plus the Haiku→Sonnet escalation rate.
- */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { check } from "./checks.js";
-import { judge } from "./judge.js";
+import { ESCALATE_BUFFER, evaluationError, judge, MODELS } from "./judge.js";
+import { buildReport, createRun } from "./reporting.js";
 import { FAITHFULNESS } from "./rubric.js";
-import type { Case } from "./types.js";
+import { MAX_TOKENS, REQUEST_POLICY } from "./transport.js";
+import { parseDataset } from "./validation.js";
+import type { Row } from "./types.js";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/** Minimal .env loader (KEY=VALUE lines) so `cp .env.example .env` just works. */
+/** Minimal .env loader. An explicitly set environment variable (even empty) takes precedence. */
 function loadEnv(): void {
-  const p = join(ROOT, ".env");
-  if (!existsSync(p)) return;
-  for (const line of readFileSync(p, "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (m && !process.env[m[1]!]) process.env[m[1]!] = m[2]!.replace(/^["']|["']$/g, "");
+  const path = join(ROOT, ".env");
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (match && process.env[match[1]!] === undefined) process.env[match[1]!] = match[2]!.replace(/^["']|["']$/g, "");
   }
 }
 
-interface Row {
-  id: string;
-  gold: "faithful" | "unfaithful";
-  predicted: "faithful" | "unfaithful" | "—";
-  score: number | null;
-  escalated: boolean;
-  refused: boolean;
-  unsupportedNumbers: number;
-  flags: string[];
+export function parseArgs(argv: string[]) {
+  const options = { checksOnly: false, quiet: false, dataset: join(ROOT, "data/cases.json"), outputDir: ROOT };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--checks-only") options.checksOnly = true;
+    else if (arg === "--quiet") options.quiet = true;
+    else if (arg === "--dataset" || arg === "--output-dir") {
+      const value = argv[++i];
+      if (!value || value.startsWith("--")) throw new Error(`${arg} requires a path.`);
+      options[arg === "--dataset" ? "dataset" : "outputDir"] = resolve(value);
+    } else throw new Error("Unknown argument. Supported: --dataset PATH --output-dir PATH --checks-only --quiet.");
+  }
+  if (["results.json", "report.md"].some((name) => resolve(options.dataset) === join(options.outputDir, name)))
+    throw new Error("Dataset path must differ from output artifact paths.");
+  return options;
 }
 
-async function main(): Promise<void> {
-  loadEnv();
-  const argv = process.argv.slice(2);
-  const checksOnly = argv.includes("--checks-only");
-  const quiet = argv.includes("--quiet");
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+function revision(): { codeRevision: string | null; workingTreeDirty: boolean | null } {
+  try {
+    return {
+      codeRevision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(),
+      workingTreeDirty: execFileSync("git", ["status", "--porcelain"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().length > 0,
+    };
+  } catch { return { codeRevision: null, workingTreeDirty: null }; }
+}
 
-  const cases = JSON.parse(readFileSync(join(ROOT, "data", "cases.json"), "utf8")) as Case[];
-  const judging = !checksOnly && !!apiKey;
-  if (!checksOnly && !apiKey) console.error("ANTHROPIC_API_KEY not set — running deterministic checks only.\n");
+/** Replace a report only after its complete contents have been written. */
+function writeArtifact(path: string, content: string): void {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, content, { encoding: "utf8", flag: "wx" });
+    renameSync(temporary, path);
+  } finally { rmSync(temporary, { force: true }); }
+}
 
+export async function main(argv = process.argv.slice(2)): Promise<number> {
+  const options = parseArgs(argv);
+  if (!options.checksOnly && process.env.ANTHROPIC_API_KEY === undefined) loadEnv();
+  const startedAt = new Date().toISOString();
+  let raw: Buffer;
+  try { raw = readFileSync(options.dataset); }
+  catch { throw new Error("Cannot read dataset file."); }
+  const cases = parseDataset(raw.toString("utf8"));
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!options.checksOnly && (!apiKey || apiKey === "sk-ant-your-key-here"))
+    throw new Error("Full mode requires ANTHROPIC_API_KEY. Set it or explicitly pass --checks-only.");
+  // Detect an unusable output directory before incurring API costs.
+  let datasetPath: string;
+  let outputDirectory: string;
+  try {
+    mkdirSync(options.outputDir, { recursive: true });
+    datasetPath = realpathSync(options.dataset);
+    outputDirectory = realpathSync(options.outputDir);
+    for (const name of ["results.json", "report.md"]) {
+      if (existsSync(join(options.outputDir, name)) && !statSync(join(options.outputDir, name)).isFile()) throw new Error();
+    }
+    const probe = join(options.outputDir, `.howdah-${randomUUID()}.tmp`);
+    try { writeFileSync(probe, "", { flag: "wx" }); }
+    finally { rmSync(probe, { force: true }); }
+  } catch { throw new Error("Cannot use output directory."); }
+  // Directory aliases can bypass the lexical check in parseArgs and overwrite the input.
+  if (["results.json", "report.md"].some((name) => join(outputDirectory, name) === datasetPath))
+    throw new Error("Dataset path must differ from output artifact paths.");
+  const code = revision();
   const rows: Row[] = [];
   for (const c of cases) {
-    const chk = check(c);
-    const row: Row = {
-      id: c.id,
-      gold: c.label,
-      predicted: "—",
-      score: null,
-      escalated: false,
-      refused: chk.stats.refused === 1,
-      unsupportedNumbers: Number(chk.stats.unsupportedNumbers ?? 0),
-      flags: [...chk.failures],
-    };
-    if (judging) {
-      // Isolate per-case failures: one API hiccup shouldn't abandon the whole run. The case stays
-      // predicted "—" and is excluded from the metrics below.
-      try {
-        const v = await judge(c, { apiKey: apiKey!, rubric: FAITHFULNESS });
-        row.predicted = v.faithful ? "faithful" : "unfaithful";
-        row.score = v.overall;
-        row.escalated = v.escalated;
-        row.flags.push(...v.flags);
-      } catch (err) {
-        row.flags.push(`judge error: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-      }
+    const row: Row = { id: c.id, gold: c.label, outcome: "skipped", checks: check(c), evaluation: null };
+    if (!options.checksOnly) {
+      try { row.evaluation = await judge(c, { apiKey: apiKey!, rubric: FAITHFULNESS }); }
+      catch { row.evaluation = evaluationError("INTERNAL_ERROR"); }
+      row.outcome = row.evaluation.outcome;
     }
     rows.push(row);
-    if (!quiet) process.stderr.write(`  ${row.id}: gold=${row.gold} predicted=${row.predicted}${row.score !== null ? ` (${row.score}/5${row.escalated ? " [sonnet]" : ""})` : ""}\n`);
+    if (!options.quiet) process.stderr.write(`Case ${rows.length}/${cases.length}: ${row.outcome}\n`);
   }
-
-  const md = buildReport(rows, judging);
-  writeFileSync(join(ROOT, "report.md"), md);
-  if (!quiet) console.log(`\n${md}`);
-  console.error(`\n✓ wrote report.md`);
+  const run = createRun({ startedAt, completedAt: new Date().toISOString(), mode: options.checksOnly ? "checks-only" : "full",
+    ...code, dataset: { file: basename(options.dataset), sha256: createHash("sha256").update(raw).digest("hex") }, rubric: FAITHFULNESS,
+    modelConfiguration: { ...MODELS, escalationBuffer: ESCALATE_BUFFER, maxTokens: MAX_TOKENS, requestPolicy: REQUEST_POLICY },
+  }, rows);
+  const markdown = buildReport(run);
+  try {
+    writeArtifact(join(options.outputDir, "results.json"), `${JSON.stringify(run, null, 2)}\n`);
+    writeArtifact(join(options.outputDir, "report.md"), markdown);
+  } catch { throw new Error("Cannot write result artifacts."); }
+  if (!options.quiet) console.log(`\n${markdown}`);
+  console.error(`Wrote results.json and report.md. Cases: ${rows.length}; evaluation errors: ${run.metrics.errors}.`);
+  return run.metrics.errors ? 1 : 0;
 }
 
-function buildReport(rows: Row[], judging: boolean): string {
-  const n = rows.length;
-  const stamp = new Date().toISOString().slice(0, 10);
-  const md: string[] = [`# Faithfulness eval report — ${stamp}`, "", `Cases: ${n}. Mode: ${judging ? "deterministic checks + LLM judge + grounding" : "deterministic checks only (no API key)"}.`, ""];
-
-  // Deterministic layer: the free number-fabrication heuristic.
-  const numHeuristicHits = rows.filter((r) => r.unsupportedNumbers > 0);
-  const numHeuristicOnUnfaithful = numHeuristicHits.filter((r) => r.gold === "unfaithful").length;
-  md.push(`## Deterministic layer (free, no API key)`);
-  md.push(`The unsupported-number heuristic flagged ${numHeuristicHits.length} case(s); ${numHeuristicOnUnfaithful} of those are gold-unfaithful (cheap fabrication catches before any LLM call).`, "");
-
-  if (judging) {
-    // Hallucination detection treated as positive class = "unfaithful". Only count cases the judge
-    // actually scored (a per-case error leaves predicted "—" and is excluded here).
-    const judged = rows.filter((r) => r.predicted !== "—");
-    const errored = rows.length - judged.length;
-    let tp = 0, fp = 0, fn = 0, tn = 0, escalated = 0;
-    for (const r of judged) {
-      const predUnfaithful = r.predicted === "unfaithful";
-      const goldUnfaithful = r.gold === "unfaithful";
-      if (predUnfaithful && goldUnfaithful) tp++;
-      else if (predUnfaithful && !goldUnfaithful) fp++;
-      else if (!predUnfaithful && goldUnfaithful) fn++;
-      else tn++;
-      if (r.escalated) escalated++;
-    }
-    const pct = (x: number) => (Number.isFinite(x) ? `${Math.round(x * 100)}%` : "n/a");
-    const precision = tp / (tp + fp);
-    const recall = tp / (tp + fn);
-    const f1 = (2 * precision * recall) / (precision + recall);
-    const accuracy = judged.length ? (tp + tn) / judged.length : NaN;
-    md.push(`## Hallucination detection (positive class = "unfaithful")`, "");
-    if (errored) md.push(`> ${errored} case(s) errored during judging and are excluded from the metrics below.`, "");
-    md.push(`| Metric | Value |`, `|---|---|`);
-    md.push(`| Accuracy | ${pct(accuracy)} |`);
-    md.push(`| Precision | ${pct(precision)} |`);
-    md.push(`| Recall | ${pct(recall)} |`);
-    md.push(`| F1 | ${pct(f1)} |`);
-    md.push(`| Judge escalations (Haiku→Sonnet) | ${escalated}/${judged.length} |`, "");
-    md.push(`Confusion matrix: TP ${tp} · FP ${fp} · FN ${fn} · TN ${tn}`, "");
-  }
-
-  md.push(`## Per-case`, "");
-  md.push(`| Case | Gold | Predicted | Score | Esc | Flag |`, `|---|---|---|---|---|---|`);
-  for (const r of rows) {
-    const correct = r.predicted === "—" ? "" : r.predicted === r.gold ? "" : " ❌";
-    md.push(`| ${r.id} | ${r.gold} | ${r.predicted}${correct} | ${r.score ?? "—"} | ${r.escalated ? "✓" : ""} | ${(r.flags[0] ?? "").slice(0, 60)} |`);
-  }
-  md.push("", `_Generated by faithfulness-eval-harness. Gold labels are in \`data/cases.json\`._`);
-  return md.join("\n");
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().then((code) => { process.exitCode = code; }).catch((error: unknown) => {
+    // Only locally constructed, sanitized errors leave main; never print stack traces or raw upstream data.
+    console.error(error instanceof Error ? error.message : "Run failed.");
+    process.exitCode = 1;
+  });
 }
-
-main().catch((err) => {
-  console.error(`\n✗ ${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(1);
-});

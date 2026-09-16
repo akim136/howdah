@@ -4,13 +4,16 @@
   "description": "An LLM-as-judge eval harness for RAG/agent answer faithfulness: deterministic checks + a Haiku→Sonnet judge cascade + a no-fabrication grounding check, scored against gold labels.",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
-    "eval": "tsx src/run.ts",
+    "eval": "node --import tsx src/run.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.13.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

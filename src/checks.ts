@@ -1,8 +1,7 @@
 /**
  * Deterministic, no-LLM checks. Cheap and free — they run without an API key and catch the obvious
- * failure modes (empty/over-long answers) plus one genuinely useful fabrication heuristic: numbers
- * asserted in the answer that never appear in the context (a common, machine-detectable hallucination).
- * They don't replace the judge; they're the fast first layer.
+ * review signals (empty/over-long answers and numbers absent from the context).
+ * These signals do not prove fabrication: valid arithmetic can introduce new numbers.
  */
 import type { Case, CheckResult } from "./types.js";
 
@@ -15,17 +14,13 @@ export function looksLikeRefusal(answer: string): boolean {
   );
 }
 
-/** Numbers stated in the answer that do not appear anywhere in the context (fabrication heuristic). */
+/** Compare entire number tokens, ignoring thousands separators and percent signs. Advisory only. */
 export function unsupportedNumbers(answer: string, context: string): string[] {
-  const norm = (s: string) => s.replace(/,/g, "");
-  const ctx = norm(context);
-  const nums = norm(answer).match(/\b\d+(?:\.\d+)?%?\b/g) ?? [];
-  const out: string[] = [];
-  for (const n of nums) {
-    const bare = n.replace(/%$/, "");
-    if (!ctx.includes(bare)) out.push(n);
-  }
-  return [...new Set(out)];
+  const tokens = (s: string) => s.replace(/\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b/g, (n) => n.replace(/,/g, ""))
+    .match(/\d+(?:\.\d+)?%?/g) ?? [];
+  const bare = (n: string) => n.replace(/%$/, "");
+  const ctx = new Set(tokens(context).map(bare));
+  return [...new Set(tokens(answer).filter((n) => !ctx.has(bare(n))))];
 }
 
 export function check(c: Case): CheckResult {
@@ -40,5 +35,6 @@ export function check(c: Case): CheckResult {
     ok: f.length === 0,
     failures: f,
     stats: { words: w, refused: refused ? 1 : 0, unsupportedNumbers: badNums.length },
+    numberSignals: badNums,
   };
 }
