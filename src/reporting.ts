@@ -1,5 +1,5 @@
 import type { Rubric } from "./rubric.js";
-import type { Row } from "./types.js";
+import type { Row, Strategy } from "./types.js";
 
 const ratio = (numerator: number, denominator: number) => denominator ? numerator / denominator : null;
 
@@ -25,6 +25,8 @@ export function calculateMetrics(rows: Row[]) {
 }
 
 export interface RunMetadata {
+  strategy?: Strategy;
+  trial?: number;
   startedAt: string;
   completedAt: string;
   mode: "full" | "checks-only";
@@ -75,6 +77,7 @@ export function buildReport(run: RunResult): string {
   const md = [
     `# Faithfulness evaluation — ${escapeMarkdown(meta.completedAt.slice(0, 10))}`, "",
     `Format: ${run.schemaVersion}. Mode: ${meta.mode}. Cases: ${m.total}.`, "",
+    `Strategy: ${meta.strategy ?? "cascade"}${meta.trial === undefined ? "" : `; trial: ${meta.trial}`}.`, "",
     `Code revision: ${escapeMarkdown(meta.codeRevision ?? "unavailable")}; working tree dirty: ${meta.workingTreeDirty ?? "unknown"}.`,
     `Dataset: ${escapeMarkdown(meta.dataset.file)}; SHA-256: ${meta.dataset.sha256}.`,
     `Rubric: ${escapeMarkdown(meta.rubric.version)}; faithfulness threshold: ${meta.rubric.threshold}.`,
@@ -90,7 +93,7 @@ export function buildReport(run: RunResult): string {
     `Confusion counts: TP ${m.confusion.tp} · FP ${m.confusion.fp} · FN ${m.confusion.fn} · TN ${m.confusion.tn}.`, "",
     "Abstentions, errors, and skipped rows remain in this report but are excluded from classification metrics. Poor classification performance does not cause an infrastructure failure.", "",
     "## Configuration and measurement", "",
-    `Models: ${escapeMarkdown(meta.modelConfiguration.screen)} → ${escapeMarkdown(meta.modelConfiguration.escalation)}. Escalation buffer: ${meta.modelConfiguration.escalationBuffer}. Max output tokens per call: ${meta.modelConfiguration.maxTokens}.`,
+    `Models: ${escapeMarkdown(meta.strategy === "haiku" ? meta.modelConfiguration.screen : meta.strategy === "sonnet" ? meta.modelConfiguration.escalation : `${meta.modelConfiguration.screen} → ${meta.modelConfiguration.escalation}`)}. Escalation buffer (cascade only): ${meta.modelConfiguration.escalationBuffer}. Max output tokens per call: ${meta.modelConfiguration.maxTokens}.`,
     `Request timeout: ${meta.modelConfiguration.requestPolicy.timeoutMs} ms; at most ${meta.modelConfiguration.requestPolicy.maxRetries} retries; backoff: ${meta.modelConfiguration.requestPolicy.backoffMs.join(", ")} ms (Retry-After capped at ${meta.modelConfiguration.requestPolicy.maxBackoffMs} ms).`, "",
     "| Dimension | Category | Weight within category |", "|---|---|---|",
     ...meta.rubric.dimensions.map((d) => tableRow([d.name, d.category, d.weight.toFixed(6)])), "",

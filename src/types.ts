@@ -9,6 +9,7 @@ export interface Case {
 }
 
 export type Outcome = "faithful" | "unfaithful" | "abstained" | "error" | "skipped";
+export type Strategy = "haiku" | "sonnet" | "cascade";
 
 /** Advisory review signals, not a faithfulness verdict. */
 export interface CheckResult {

@@ -51,6 +51,19 @@ globalThis.fetch = async () => {
 const reply = (body: unknown) => ({ body: envelope(body) });
 
 describe("CLI", () => {
+  it.each(["haiku", "sonnet"])("records the selected %s strategy without escalation", (strategy) => {
+    const child = runFixture([CASE], [reply(rubricResponse([1, 1, 5, 5])), reply(groundingResponse())], ["--strategy", strategy, "--quiet"]);
+    expect(child.status).toBe(0);
+    expect(child.calls).toBe(2);
+    expect(child.read().metadata.strategy).toBe(strategy);
+    expect(child.read().rows[0]?.evaluation?.escalated).toBe(false);
+    expect(child.report()).toContain(`Strategy: ${strategy}`);
+  });
+  it("rejects an unknown strategy before requests", () => {
+    const child = runFixture([CASE], [], ["--strategy", "unknown"]);
+    expect(child.status).toBe(1);
+    expect(child.calls).toBe(0);
+  });
   it("writes versioned checks-only artifacts with every case skipped and zero API calls", () => {
     const child = runFixture([CASE, { ...CASE, id: "empty", answer: "" }], [], ["--checks-only", "--quiet"], "");
     expect(child.status).toBe(0);

@@ -96,3 +96,29 @@ describe("judge cascade", () => {
     expect(JSON.stringify(value)).not.toContain("private upstream data");
   });
 });
+
+describe("single-model strategies", () => {
+  it("rejects an invalid strategy at the library boundary before any request", async () => {
+    const fetchImpl = vi.fn(mockFetch([]));
+    await expect(judge(CASE, { apiKey: "test", rubric: FAITHFULNESS, fetchImpl, strategy: "unknown" as "haiku" })).rejects.toThrow("Unknown judge strategy");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it.each(["haiku", "sonnet"] as const)("uses only %s even when its judgment fails or abstains", async (strategy) => {
+    const model = strategy === "haiku" ? MODELS.screen : MODELS.escalation;
+    for (const rubric of [rubricResponse([1, 1, 5, 5], ["contradiction"]), rubricAbstention]) {
+      const fetchImpl = vi.fn(mockFetch([envelope(rubric, "end_turn", model), envelope(groundingResponse(), "end_turn", model)]));
+      const result = await judge(CASE, { apiKey: "test", rubric: FAITHFULNESS, fetchImpl, strategy });
+      expect(result.outcome).toBe(rubric.status === "abstained" ? "abstained" : "unfaithful");
+      expect(result.escalated).toBe(false);
+      expect(result.stages.map((s) => s.model)).toEqual([model, model]);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(fetchImpl.mock.calls.map((call) => JSON.parse(call[1]!.body as string).model)).toEqual([model, model]);
+    }
+  });
+  it.each(["haiku", "sonnet"] as const)("retains failures without a fallback for %s", async (strategy) => {
+    const fetchImpl = vi.fn(mockFetch([envelope("{}"), envelope(groundingResponse())]));
+    const result = await judge(CASE, { apiKey: "test", rubric: FAITHFULNESS, fetchImpl, strategy });
+    expect(result).toMatchObject({ outcome: "error", escalated: false, errorCode: "INVALID_SCHEMA" });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+});
